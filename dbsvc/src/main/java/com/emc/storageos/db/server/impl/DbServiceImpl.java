@@ -539,25 +539,34 @@ public class DbServiceImpl implements DbService {
         instance = this; // NOSONAR ("squid:S2444")
 
         initKeystoreAndTruststore();
+        _log.info("lby0");
         System.setProperty("cassandra.config", _config);
         System.setProperty("cassandra.config.loader", CassandraConfigLoader.class.getName());
 
+        _log.info("lby1");
         InterProcessLock lock = null;
         Configuration config = null;
         boolean schemaInited = false;
 
+        _log.info("lby2");
         try {
             // we use this lock to discourage more than one node bootstrapping / joining at the same time
             // Cassandra can handle this but it's generally not recommended to make changes to schema concurrently
             lock = getLock(getSchemaLockName());
 
+            _log.info("lby3");
             config = checkConfiguration();
+            _log.info("lby4");
             checkGlobalConfiguration();
+            _log.info("lby5");
             checkVersionedConfiguration();
+            _log.info("lby6");
             removeStaleConfiguration();
 
+            _log.info("lby7");
             // The num_tokens in ZK is what we previously running at, which could be different from in current .yaml
             checkNumTokens(config);
+            _log.info("lby8");
             StartupMode mode = checkStartupMode(config);
             _log.info("Current startup mode is {}", mode);
 
@@ -618,6 +627,10 @@ public class DbServiceImpl implements DbService {
             _schemaUtil.checkAndSetupBootStrapInfo(_dbClient);
         }
 
+        String ver = _serviceInfo.getVersion();
+        List<Service> services = _coordinator.locateAllServices(_serviceInfo.getName(), ver, null, null);
+        _log.info("lby ver={} services.size={}", ver, services.size());
+
         if (_handler.run()) {
             // Setup the bootstrap info root tenant, if root tenant migrated from local db, then skip it
             if (isGeoDbsvc()) {
@@ -652,11 +665,13 @@ public class DbServiceImpl implements DbService {
      * Check Cassandra num_tokens settting in ZK.
      */
     private void checkNumTokens(Configuration config) {
+        _log.info("lby begin check NumTokens");
         String numTokensEffective = config.getConfig(DbConfigConstants.NUM_TOKENS_KEY);
         if (numTokensEffective == null) {
             numTokensEffective = String.valueOf(isGeoDbsvc() ? INIT_GEO_DB_NUM_TOKENS : INIT_LOCAL_DB_NUM_TOKENS);
         }
 
+        _log.info("lby begin numTkoekensEffective={}", numTokensEffective);
         System.setProperty(CassandraConfigLoader.SYSPROP_NUM_TOKENS, numTokensEffective);
         _log.info("Effective Cassandra num of tokens {}", numTokensEffective);
     }

@@ -157,7 +157,10 @@ public class MigrationHandlerImpl implements MigrationHandler {
         statusChecker.setVersion(targetVersion);
         statusChecker.setServiceName(service.getName());
         // dbsvc will wait for all dbsvc, and geodbsvc waits for all geodbsvc.
-        statusChecker.waitForAllNodesMigrationInit();
+        // statusChecker.waitForAllNodesMigrationInit();
+        log.info("lby clusterNodecount={}", statusChecker.getClusterNodeCount());
+        statusChecker.waitForQuorumNodes(service.getName(), targetVersion);
+        log.info("lby quorum nodes are running");
 
         if (schemaUtil.isGeoDbsvc()) {
             // no migration procedure for geosvc, just wait till migration is done on one of the
@@ -166,25 +169,30 @@ public class MigrationHandlerImpl implements MigrationHandler {
             statusChecker.waitForMigrationDone();
             return true;
         } else {
+            log.info("lbyx0");
             // We support adjusting num_tokens for dbsvc, have to wait for it to complete before continue.
             // geodbsvc is not supported to adjust num_tokens, yet, if it's enabled in UpgradeManager,
             // move this to common code path in both dbsvc and geodbsvc.
             statusChecker.waitForAllNodesNumTokenAdjusted();
+            log.info("lbyx1");
 
             // for dbsvc, we have to wait till all geodbsvc becomes migration_init since we might
             // need to copy geo-replicated resources from local to geo db.
-            statusChecker.waitForAllNodesMigrationInit(Constants.GEODBSVC_NAME);
+            //statusChecker.waitForAllNodesMigrationInit(Constants.GEODBSVC_NAME);
+            statusChecker.waitForQuorumNodes(Constants.GEODBSVC_NAME, targetVersion);
+            log.info("lbyx2");
         }
 
         InterProcessLock lock = null;
         String currentSchemaVersion = null;
         int retryCount = 0;
         while (retryCount < MAX_MIGRATION_RETRY) {
-            log.debug("Migration handlers - Start. Trying to grab lock ...");
+            log.info("Migration handlers - Start. Trying to grab lock ...");
             try {
                 // grab global lock for migration
                 lock = getLock(DB_MIGRATION_LOCK);
 
+                log.info("lby get Migration lock");
                 // make sure we haven't finished the migration on another node already
                 MigrationStatus status = coordinator.getMigrationStatus();
                 if (status != null) {

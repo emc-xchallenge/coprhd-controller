@@ -6,6 +6,7 @@ package com.emc.storageos.db.common;
 
 import java.util.List;
 
+import com.emc.storageos.coordinator.common.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -170,9 +171,11 @@ public class DbServiceStatusChecker {
         waitForAllNodesToBecome(DbConfigConstants.JOINED, false);
     }
 
+    /*
     public void waitForAllNodesMigrationInit() {
         waitForAllNodesMigrationInit(serviceName);
     }
+    */
 
     public void waitForAllNodesNumTokenAdjusted() {
         while (true) {
@@ -212,6 +215,32 @@ public class DbServiceStatusChecker {
 
     public void waitForAllNodesMigrationInit(String svcName) {
         waitForAllNodesToBecome(DbConfigConstants.MIGRATION_INIT, true, svcName);
+    }
+
+    public void waitForQuorumNodes(String svcName, String version) {
+
+        log.info("lby svcname={} version={}", svcName, version);
+
+        while (true) {
+            try {
+                List<Service> services = coordinator.locateAllServices(svcName, version, null, null);
+                int runningServiceNumber = services.size();
+                log.info("lby ver={} services.size={}", version, runningServiceNumber);
+
+                if (runningServiceNumber > clusterNodeCount/2 ) {
+                    log.info("lby there are quorum nodes ({}) running.", runningServiceNumber);
+                    break;
+                }
+
+                log.info("lby service size={} nodeCount={}", runningServiceNumber, clusterNodeCount);
+                // check every 30 seconds and there's no timeout
+                Thread.sleep(WAIT_INTERVAL_IN_SEC * 30 * 1000);
+            } catch (InterruptedException ex) {
+                log.warn("InterruptedException:{}", ex);
+            } catch (Exception ex) {
+                log.error("exception checking db status", ex);
+            }
+        }
     }
 
     public boolean isMigrationDone() {
