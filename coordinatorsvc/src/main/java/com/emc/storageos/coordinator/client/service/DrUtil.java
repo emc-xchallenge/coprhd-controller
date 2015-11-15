@@ -22,12 +22,16 @@ import org.slf4j.LoggerFactory;
 import com.emc.storageos.coordinator.client.model.Constants;
 import com.emc.storageos.coordinator.client.model.Site;
 import com.emc.storageos.coordinator.client.model.SiteInfo;
+import com.emc.storageos.coordinator.client.model.SiteState;
 import com.emc.storageos.coordinator.client.service.impl.CoordinatorClientImpl;
+import com.emc.storageos.coordinator.client.service.impl.CoordinatorClientInetAddressMap;
 import com.emc.storageos.coordinator.common.Configuration;
 import com.emc.storageos.coordinator.common.Service;
 import com.emc.storageos.coordinator.exceptions.CoordinatorException;
 import com.emc.storageos.coordinator.exceptions.RetryableCoordinatorException;
+import com.emc.storageos.svcs.errorhandling.resources.APIException;
 import com.emc.storageos.svcs.errorhandling.resources.ServiceCode;
+import com.emc.vipr.model.sys.ClusterInfo;
 
 /**
  * Common utility functions for Disaster Recovery
@@ -297,5 +301,42 @@ public class DrUtil {
             } catch (Exception ex) {}
         }
         return null;
+    }
+    
+    /*
+     * Internal method to check whether failover to standby is allowed
+     */
+    public void precheckForFailover() {
+        Site standby = getLocalSite();
+        String standbyUuid = standby.getUuid();
+        
+        // show be only standby
+        if (isPrimary()) {
+            throw APIException.internalServerErrors.failoverPrecheckFailed(standbyUuid, "Failover can't be executed in primary site");
+        }
+
+        // should be SYNCED
+        if (standby.getState() != SiteState.STANDBY_SYNCED) {
+            throw APIException.internalServerErrors.failoverPrecheckFailed(standbyUuid, "Standby site is not fully synced");
+        }
+
+        // Current site is stable
+        ClusterInfo.ClusterState state = coordinator.getControlNodesState(standbyUuid, standby.getNodeCount());
+        if (state != ClusterInfo.ClusterState.STABLE) {
+            log.info("Site {} is not stable {}", standbyUuid, state);
+            throw APIException.internalServerErrors.failoverPrecheckFailed(standbyUuid,
+                    String.format("Site %s is not stable", standby.getName()));
+        }
+        
+        // this is standby site and NOT in ZK read-only or observer mode,
+        // it means primary is down and local ZK has been reconfig to participant
+        CoordinatorClientInetAddressMap addrLookupMap = coordinator.getInetAddessLookupMap();
+        String myNodeId = addrLookupMap.getNodeId();
+        String coordinatorMode = getLocalCoordinatorMode(myNodeId);
+        log.info("Local coordinator mode is {}", coordinatorMode);
+        if (DrUtil.ZOOKEEPER_MODE_OBSERVER.equals(coordinatorMode) || DrUtil.ZOOKEEPER_MODE_READONLY.equals(coordinatorMode)) {
+            log.info("Primary is available now, can't do failover");
+            throw APIException.internalServerErrors.failoverPrecheckFailed(standbyUuid, "Primary is available now, can't do failover");
+        }
     }
 }
