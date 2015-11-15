@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.emc.storageos.api.mapper.SiteMapper;
+import com.emc.storageos.api.service.impl.resource.utils.InternalDRServiceClient;
 import com.emc.storageos.coordinator.client.model.RepositoryInfo;
 import com.emc.storageos.coordinator.client.model.Site;
 import com.emc.storageos.coordinator.client.model.SiteError;
@@ -41,7 +42,6 @@ import com.emc.storageos.coordinator.client.service.CoordinatorClient;
 import com.emc.storageos.coordinator.client.service.DrUtil;
 import com.emc.storageos.coordinator.client.service.impl.CoordinatorClientInetAddressMap;
 import com.emc.storageos.coordinator.common.Configuration;
-import com.emc.storageos.coordinator.common.Service;
 import com.emc.storageos.coordinator.exceptions.CoordinatorException;
 import com.emc.storageos.db.client.DbClient;
 import com.emc.storageos.db.client.impl.DbClientImpl;
@@ -311,6 +311,36 @@ public class DisasterRecoveryService {
             log.info("Can't find site with specified site ID {}", uuid);
         } catch (Exception e) {
             log.error("Error finding site from ZK for UUID " + uuid, e);
+        }
+        return null;
+    }
+    
+    @POST
+    @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
+    @CheckPermission(roles = { Role.SECURITY_ADMIN, Role.RESTRICTED_SECURITY_ADMIN,
+            Role.SYSTEM_ADMIN, Role.RESTRICTED_SYSTEM_ADMIN, Role.SYSTEM_MONITOR})
+    @Path("/precheckTest")
+    public Response getInternalSite() {
+        log.info("begin test");
+        
+        try {
+            List<Site> allStandbySites = drUtil.listStandbySites();
+            
+            for (Site site : allStandbySites) {
+                InternalDRServiceClient client = new InternalDRServiceClient(site.getVip());
+                client.setCoordinatorClient(coordinator);
+                client.setKeyGenerator(apiSignatureGenerator);
+                
+                try {
+                    client.failoverPrecheck();
+                } catch (InternalServerErrorException e) {
+                    log.warn("Precheck fail with error {}", e);
+                }
+            }
+            
+            return Response.status(Response.Status.ACCEPTED).build();
+        } catch (Exception e) {
+            log.error("Error occurs: {}", e);
         }
         return null;
     }
@@ -646,10 +676,12 @@ public class DisasterRecoveryService {
     public Response doFailover(@PathParam("uuid") String uuid) {
         log.info("Begin to failover for standby UUID {}", uuid);
 
-        precheckForFailover(uuid);
+        precheckForFailoverLocally(uuid);
         
         Site currentSite = drUtil.getSiteFromLocalVdc(uuid);
         try {
+            
+            List<Site> allStandbySites = drUtil.listStandbySites();
             
             //set state
             Site oldPrimarySite = drUtil.getSiteFromLocalVdc(drUtil.getPrimarySiteId());
@@ -664,6 +696,12 @@ public class DisasterRecoveryService {
             
             //reconfig
             drUtil.updateVdcTargetVersion(uuid, SiteInfo.RECONFIG_RESTART);
+            
+            for (Site site : allStandbySites) {
+                if (!site.getUuid().equals(uuid)) {
+                    //TODO notify other site to failover
+                }
+            }
             
             auditDisasterRecoveryOps(OperationTypeEnum.FAILOVER, AuditLogManager.AUDITLOG_SUCCESS, null, uuid, currentSite.getVip(), currentSite.getName());
             return Response.status(Response.Status.ACCEPTED).build();
@@ -788,10 +826,7 @@ public class DisasterRecoveryService {
         }
     }
     
-    /*
-     * Internal method to check whether failover to standby is allowed
-     */
-    protected void precheckForFailover(String standbyUuid) {
+    protected void precheckForFailoverLocally(String standbyUuid) {
         Site standby = drUtil.getLocalSite();
 
         // API should be only send to local site 
@@ -800,6 +835,16 @@ public class DisasterRecoveryService {
                     String.format("Failover can only be executed in local site. Local site uuid %s is not matched with uuid %s",
                             standby.getUuid(), standbyUuid));
         }
+        
+        precheckForFailover();
+    }
+    
+    /*
+     * Internal method to check whether failover to standby is allowed
+     */
+    protected void precheckForFailover() {
+        Site standby = drUtil.getLocalSite();
+        String standbyUuid = standby.getUuid();
         
         // show be only standby
         if (drUtil.isPrimary()) {

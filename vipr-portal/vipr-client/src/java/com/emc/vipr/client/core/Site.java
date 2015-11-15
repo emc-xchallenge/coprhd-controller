@@ -61,6 +61,10 @@ public class Site extends AbstractCoreResources<SiteRestRep> implements TopLevel
     public SiteRestRep getSite(String uuid) {
         return client.get(SiteRestRep.class, PathConstants.SITE_URL + "/" + uuid);
     }
+    
+    public SiteRestRep getInternalSite(String uuid) {
+        return client.get(SiteRestRep.class, PathConstants.SITE_URL + "/internal/" + uuid);
+    }
 
     public SiteList listAllSites() {
         return client.get(SiteList.class, PathConstants.SITE_URL);
