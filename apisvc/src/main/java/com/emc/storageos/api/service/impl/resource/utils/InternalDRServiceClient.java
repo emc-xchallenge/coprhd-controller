@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.emc.storageos.security.helpers.BaseServiceClient;
+import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 
 public class InternalDRServiceClient extends BaseServiceClient {
@@ -30,12 +31,12 @@ public class InternalDRServiceClient extends BaseServiceClient {
     public Response failoverPrecheck() {
         String getVdcPath = String.format("/internal/site/failovercheck");
         WebResource rRoot = createRequest(getVdcPath);
-        Response resp = null;
+        ClientResponse resp = null;
         try {
-            resp = addSignature(rRoot).post(Response.class);
+            resp = addSignature(rRoot).post(ClientResponse.class);
         } catch (Exception e) {
             log.warn("Fail to send request to precheck failover", e);
         }
-        return resp;
+        return resp.getEntity(Response.class);
     }
 }
