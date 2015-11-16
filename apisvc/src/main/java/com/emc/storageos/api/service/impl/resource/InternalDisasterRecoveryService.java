@@ -11,11 +11,9 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.emc.storageos.api.service.impl.resource.utils.InternalDRServiceClient;
 import com.emc.storageos.coordinator.client.model.Site;
 import com.emc.storageos.coordinator.client.model.SiteInfo;
 import com.emc.storageos.coordinator.client.model.SiteState;
-import com.emc.storageos.coordinator.client.service.DrUtil;
 import com.emc.storageos.security.audit.AuditLogManager;
 import com.emc.storageos.services.OperationTypeEnum;
 import com.emc.storageos.svcs.errorhandling.resources.APIException;
@@ -23,23 +21,26 @@ import com.emc.storageos.svcs.errorhandling.resources.APIException;
 /**
  * Internal API for disaster recovery service
  */
-@Path("/internal/site")
+@Path("/site")
 public class InternalDisasterRecoveryService extends DisasterRecoveryService {
     private static final Logger log = LoggerFactory.getLogger(InternalDisasterRecoveryService.class);
     
     @POST
-    @Path("/failoverprecheck")
+    @Path("/internal/failoverprecheck")
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
-    public void failoverPrecheck() {
+    public Response failoverPrecheck() {
         log.info("Precheck for failover internally");
+        
         precheckForFailover();
+        
+        return Response.status(Response.Status.ACCEPTED).build();
     }
     
     @POST
-    @Path("/failover")
+    @Path("/internal/failover")
     @Consumes({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
-    public void failover(@QueryParam("newPrimaryUUid") String newPrimaryUUid) {
+    public Response failover(@QueryParam("newPrimaryUUid") String newPrimaryUUid) {
         log.info("Begin to failover internally with newPrimaryUUid {}", newPrimaryUUid);
         
         Site currentSite = drUtil.getLocalSite();
@@ -59,6 +60,7 @@ public class InternalDisasterRecoveryService extends DisasterRecoveryService {
             drUtil.updateVdcTargetVersion(currentSite.getUuid(), SiteInfo.RECONFIG_RESTART);
             
             auditDisasterRecoveryOps(OperationTypeEnum.FAILOVER, AuditLogManager.AUDITLOG_SUCCESS, null, uuid, currentSite.getVip(), currentSite.getName());
+            return Response.status(Response.Status.ACCEPTED).build();
         } catch (Exception e) {
             log.error("Error happened when failover at site %s", uuid, e);
             auditDisasterRecoveryOps(OperationTypeEnum.FAILOVER, AuditLogManager.AUDITLOG_FAILURE, null, uuid, currentSite.getVip(), currentSite.getName());

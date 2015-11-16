@@ -2,8 +2,6 @@ package com.emc.storageos.api.service.impl.resource.utils;
 
 import java.net.URI;
 
-import javax.ws.rs.core.Response;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,31 +22,28 @@ public class InternalDRServiceClient extends BaseServiceClient {
     
     @Override
     public void setServer(String server) {
-        setServiceURI(URI.create("https://" + server + ":8443"));
+        setServiceURI(URI.create("https://" + server + ":4443"));
     }
     
     
-    public Response failoverPrecheck() {
-        String getVdcPath = String.format("/internal/site/failoverprecheck");
+    public void failoverPrecheck() {
+        String getVdcPath = String.format("/site/internal/failoverprecheck");
         WebResource rRoot = createRequest(getVdcPath);
-        ClientResponse resp = null;
         try {
-            resp = addSignature(rRoot).post(ClientResponse.class);
+            addSignature(rRoot).post(ClientResponse.class);
         } catch (Exception e) {
             log.warn("Fail to send request to precheck failover", e);
         }
-        return resp.getEntity(Response.class);
+        
     }
     
-    public Response failover(String newPrimaryUUid) {
-        String getVdcPath = String.format("/internal/site/failover?newPrimaryUUid=%s", newPrimaryUUid);
+    public void failover(String newPrimaryUUid) {
+        String getVdcPath = String.format("/site/internal/failover?newPrimaryUUid=%s", newPrimaryUUid);
         WebResource rRoot = createRequest(getVdcPath);
-        ClientResponse resp = null;
         try {
-            resp = addSignature(rRoot).post(ClientResponse.class);
+            addSignature(rRoot).post(ClientResponse.class);
         } catch (Exception e) {
             log.warn("Fail to send request to precheck failover", e);
         }
-        return resp.getEntity(Response.class);
     }
 }

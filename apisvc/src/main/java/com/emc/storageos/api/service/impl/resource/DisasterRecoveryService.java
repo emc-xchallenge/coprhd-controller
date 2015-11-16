@@ -657,6 +657,8 @@ public class DisasterRecoveryService {
         for (Site site : allStandbySites) {
             if (!site.getUuid().equals(uuid)) {
                 InternalDRServiceClient client = new InternalDRServiceClient(site.getVip());
+                client.setCoordinatorClient(coordinator);
+                client.setKeyGenerator(apiSignatureGenerator);
                 client.failoverPrecheck();
                 clientCacheMap.put(site.getUuid(), client);
             }
@@ -704,6 +706,8 @@ public class DisasterRecoveryService {
         for (Site site : allStandbySites) {
             if (!site.getUuid().equals(uuid)) {
                 InternalDRServiceClient client = new InternalDRServiceClient(site.getVip());
+                client.setCoordinatorClient(coordinator);
+                client.setKeyGenerator(apiSignatureGenerator);
                 client.failoverPrecheck();
             }
         }
