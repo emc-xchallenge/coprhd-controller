@@ -29,7 +29,19 @@ public class InternalDRServiceClient extends BaseServiceClient {
     
     
     public Response failoverPrecheck() {
-        String getVdcPath = String.format("/internal/site/failovercheck");
+        String getVdcPath = String.format("/internal/site/failoverprecheck");
+        WebResource rRoot = createRequest(getVdcPath);
+        ClientResponse resp = null;
+        try {
+            resp = addSignature(rRoot).post(ClientResponse.class);
+        } catch (Exception e) {
+            log.warn("Fail to send request to precheck failover", e);
+        }
+        return resp.getEntity(Response.class);
+    }
+    
+    public Response failover(String newPrimaryUUid) {
+        String getVdcPath = String.format("/internal/site/failover?newPrimaryUUid=%s", newPrimaryUUid);
         WebResource rRoot = createRequest(getVdcPath);
         ClientResponse resp = null;
         try {

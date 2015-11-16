@@ -7,8 +7,10 @@ package com.emc.storageos.api.service.impl.resource;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.crypto.SecretKey;
@@ -91,10 +93,10 @@ public class DisasterRecoveryService {
     private InternalApiSignatureKeyGenerator apiSignatureGenerator;
     private SiteMapper siteMapper;
     private SysUtils sysUtils;
-    private CoordinatorClient coordinator;
+    protected CoordinatorClient coordinator;
     private DbClient dbClient;
     private IPsecConfig ipsecConfig;
-    private DrUtil drUtil;
+    protected DrUtil drUtil;
     
     @Autowired
     private AuditLogManager auditMgr;
@@ -311,36 +313,6 @@ public class DisasterRecoveryService {
             log.info("Can't find site with specified site ID {}", uuid);
         } catch (Exception e) {
             log.error("Error finding site from ZK for UUID " + uuid, e);
-        }
-        return null;
-    }
-    
-    @POST
-    @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
-    @CheckPermission(roles = { Role.SECURITY_ADMIN, Role.RESTRICTED_SECURITY_ADMIN,
-            Role.SYSTEM_ADMIN, Role.RESTRICTED_SYSTEM_ADMIN, Role.SYSTEM_MONITOR})
-    @Path("/precheckTest")
-    public Response getInternalSite() {
-        log.info("begin test");
-        
-        try {
-            List<Site> allStandbySites = drUtil.listStandbySites();
-            
-            for (Site site : allStandbySites) {
-                InternalDRServiceClient client = new InternalDRServiceClient(site.getVip());
-                client.setCoordinatorClient(coordinator);
-                client.setKeyGenerator(apiSignatureGenerator);
-                
-                try {
-                    client.failoverPrecheck();
-                } catch (InternalServerErrorException e) {
-                    log.warn("Precheck fail with error {}", e);
-                }
-            }
-            
-            return Response.status(Response.Status.ACCEPTED).build();
-        } catch (Exception e) {
-            log.error("Error occurs: {}", e);
         }
         return null;
     }
@@ -678,11 +650,19 @@ public class DisasterRecoveryService {
 
         precheckForFailoverLocally(uuid);
         
+        Map<String, InternalDRServiceClient> clientCacheMap = new HashMap<String, InternalDRServiceClient>();
         Site currentSite = drUtil.getSiteFromLocalVdc(uuid);
+        List<Site> allStandbySites = drUtil.listStandbySites();
+        
+        for (Site site : allStandbySites) {
+            if (!site.getUuid().equals(uuid)) {
+                InternalDRServiceClient client = new InternalDRServiceClient(site.getVip());
+                client.failoverPrecheck();
+                clientCacheMap.put(site.getUuid(), client);
+            }
+        }
+        
         try {
-            
-            List<Site> allStandbySites = drUtil.listStandbySites();
-            
             //set state
             Site oldPrimarySite = drUtil.getSiteFromLocalVdc(drUtil.getPrimarySiteId());
             oldPrimarySite.setState(SiteState.PRIMARY_FAILING_OVER);
@@ -694,14 +674,16 @@ public class DisasterRecoveryService {
             //set new primary uuid
             coordinator.setPrimarySite(uuid);
             
-            //reconfig
-            drUtil.updateVdcTargetVersion(uuid, SiteInfo.RECONFIG_RESTART);
-            
+            //reconfig other standby sites
             for (Site site : allStandbySites) {
                 if (!site.getUuid().equals(uuid)) {
-                    //TODO notify other site to failover
+                    InternalDRServiceClient client = clientCacheMap.get(site.getUuid());
+                    client.failover(uuid);
                 }
             }
+            
+            //reconfig this site itself
+            drUtil.updateVdcTargetVersion(uuid, SiteInfo.RECONFIG_RESTART);
             
             auditDisasterRecoveryOps(OperationTypeEnum.FAILOVER, AuditLogManager.AUDITLOG_SUCCESS, null, uuid, currentSite.getVip(), currentSite.getName());
             return Response.status(Response.Status.ACCEPTED).build();
@@ -710,6 +692,22 @@ public class DisasterRecoveryService {
             auditDisasterRecoveryOps(OperationTypeEnum.FAILOVER, AuditLogManager.AUDITLOG_FAILURE, null, uuid, currentSite.getVip(), currentSite.getName());
             throw APIException.internalServerErrors.failoverFailed(uuid, e.getMessage());
         }
+    }
+    
+    @POST
+    @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
+    @Path("/{uuid}/test")
+    @CheckPermission(roles = { Role.SECURITY_ADMIN, Role.RESTRICTED_SECURITY_ADMIN }, blockProxies = true)
+    public Response doTest(@PathParam("uuid") String uuid) {
+        List<Site> allStandbySites = drUtil.listStandbySites();
+        
+        for (Site site : allStandbySites) {
+            if (!site.getUuid().equals(uuid)) {
+                InternalDRServiceClient client = new InternalDRServiceClient(site.getVip());
+                client.failoverPrecheck();
+            }
+        }
+        return Response.status(Response.Status.ACCEPTED).build();
     }
 
     private Site validateSiteConfig(String uuid) {

@@ -614,7 +614,7 @@
                 </bean>
                 
                 <bean class="com.emc.storageos.api.service.impl.resource.InternalDisasterRecoveryService">
-                    
+                    <property name="coordinator" ref="coordinator"/>
                 </bean>
             </set>
         </property>
