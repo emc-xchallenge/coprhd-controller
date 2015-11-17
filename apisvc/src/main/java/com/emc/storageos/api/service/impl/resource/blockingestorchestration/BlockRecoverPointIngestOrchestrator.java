@@ -128,6 +128,10 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
 
         RPIngestionContext context = new RPIngestionContext(unManagedVolume, _dbClient);
 
+        // NOTES
+        // try and if everything succeeds, we call context.commit; 
+        // otherwise, the catch block will call context.rollback and throw an exception up the chain
+
         try {
             
             ingestBlockObjectsInternal(systemCache, poolCache, system, unManagedVolume, vPool, virtualArray, project, tenant,
@@ -185,6 +189,7 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
             Map<String, StringBuffer> taskStatusMap, String vplexIngestionMethod, RPIngestionContext context) {
         
         context.validate();
+        // TODO could maybe wrap up and include all this validation below...
         
         String volumeNativeGuid = unManagedVolume.getNativeGuid().replace(VolumeIngestionUtil.UNMANAGEDVOLUME,
                 VolumeIngestionUtil.VOLUME);
@@ -207,6 +212,16 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
             throw IngestionException.exceptions.rpIngestingNonVolumeObject(unManagedVolume.getNativeGuid());
         }
         
+        // NOTES
+        // basically any DataObject created should be added to 
+        // the appropriate context collection and only saved
+        // at the very end if everything succeeds
+        // 
+        // will probably have to add smarts in the RPIngestionContext
+        // to check the database and if not found, fall back to check the Context
+        // object collections for various things (or vice versa) 
+        // (some object might have been saved by a previous ingestion attempt)
+        
         Volume volume = (Volume)blockObject;
         // Perform RP-specific volume ingestion
         volume = performRPVolumeIngestion(project, virtualArray, vPool, system, unManagedVolume, systemCache, poolCache, tenant,
@@ -220,7 +235,7 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
         // Update the unmanaged protection set
         decorateUnManagedProtectionSet(context);
 
-        // TODO: etc etc with context object
+        // TODO: etc etc with context object holding DataObject references
         
         // Perform RP-specific export ingestion
         performRPExportIngestion(project, virtualArray, vPool, unManagedVolume, volume); 
@@ -551,6 +566,13 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
         volume.setRSetName(rpRSetName); // This comes from UNMANAGED_CG discovery of Protection System
         volume.setInternalSiteName(rpInternalSiteName); // This comes from UNMANAGED_CG discovery of Protection System
         volume.setProtectionController(URI.create(rpProtectionSystem)); // This comes from UNMANAGED_CG discovery of Protection System
+        
+        // NOTES
+        // as an example, here we are adding to the context collections
+        // rather than immediately saving to the database.
+        // alternately, we COULD save early to the database and rely more
+        // on rollback to sort things out... not yet sure which is better or worse
+        
         if (null != _dbClient.queryObject(Volume.class, volume.getId())) {
              context.getObjectsToUpdate().add(volume);
         } else {
