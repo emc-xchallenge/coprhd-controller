@@ -906,11 +906,12 @@ public class VplexBackendIngestionContext implements IngestionContext {
     }
 
     /* (non-Javadoc)
-     * @see com.emc.storageos.vplexcontroller.IngestionContext#rollback()
+     * @see com.emc.storageos.volumecontroller.IngestionContext#validate()
      */
     @Override
-    public void rollback() {
-        _logger.info("rollback not implemented for VPLEX volume ingestion.");
+    public void validate() {
+        // TODO Auto-generated method stub
+        
     }
 
     /* (non-Javadoc)
@@ -920,6 +921,14 @@ public class VplexBackendIngestionContext implements IngestionContext {
     public void commit() {
         // TODO Auto-generated method stub
         
+    }
+
+    /* (non-Javadoc)
+     * @see com.emc.storageos.vplexcontroller.IngestionContext#rollback()
+     */
+    @Override
+    public void rollback() {
+        _logger.info("rollback not implemented for VPLEX volume ingestion.");
     }
 
     /**

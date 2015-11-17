@@ -49,6 +49,11 @@ public interface IngestionContext {
     public abstract List<BlockObject> getIngestedObjects();
 
     /**
+     * Validates this context for ingestion.
+     */
+    public abstract void validate();
+
+    /**
      * Commits any changes within this context.
      */
     public abstract void commit();

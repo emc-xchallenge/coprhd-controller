@@ -125,30 +125,25 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
             VirtualPool vPool, VirtualArray virtualArray, Project project, TenantOrg tenant, List<UnManagedVolume> unManagedVolumesSuccessfullyProcessed, 
             Map<String, BlockObject> createdObjectMap, Map<String, List<DataObject>> updatedObjectMap, boolean unManagedVolumeExported, Class<T> clazz, 
             Map<String, StringBuffer> taskStatusMap, String vplexIngestionMethod) throws IngestionException {
-        RPIngestionContext context = new RPIngestionContext();
-        Volume volume = null;
-        
-        try {
-            // Make sure there's an unmanaged protection set
-            UnManagedProtectionSet umpset = getUnManagedProtectionSet(unManagedVolume);
-            if (umpset == null) {
-                _logger.warn("No unmanaged protection set could be found for unmanaged volume: " + unManagedVolume.getNativeGuid() + " Please run unmanaged CG discovery of registered protection system");
-                throw IngestionException.exceptions.unManagedProtectionSetNotFound(unManagedVolume.getNativeGuid());
-            }
 
-            volume = (Volume)ingestBlockObjectsInternal(systemCache, poolCache, system, unManagedVolume, vPool, virtualArray, project, tenant,
-                    unManagedVolumesSuccessfullyProcessed, createdObjectMap, updatedObjectMap, unManagedVolumeExported, clazz, taskStatusMap,
-                    vplexIngestionMethod);
+        RPIngestionContext context = new RPIngestionContext(unManagedVolume, _dbClient);
+
+        try {
+            context.validate();
             
-            // Reload the unmanaged protection set after ingestion
-            umpset = _dbClient.queryObject(UnManagedProtectionSet.class, umpset.getId());
+            ingestBlockObjectsInternal(systemCache, poolCache, system, unManagedVolume, vPool, virtualArray, project, tenant,
+                    unManagedVolumesSuccessfullyProcessed, createdObjectMap, updatedObjectMap, unManagedVolumeExported, clazz, taskStatusMap,
+                    vplexIngestionMethod, context);
             
             // Experimental auto-ingestion feature.  Only run it if we haven't ingested everything yet.
             /*
+            // Reload the unmanaged protection set after ingestion
+            umpset = _dbClient.queryObject(UnManagedProtectionSet.class, umpset.getId());
+            
             if (!validateAllVolumesInCGIngested(unManagedVolume, umpset)) {
                 performAutoIngestOnRemainingVolumes(umpset, systemCache, poolCache, project, tenant,
                         unManagedVolumesSuccessfullyProcessed, createdObjectMap, updatedObjectMap, unManagedVolumeExported,
-                        taskStatusMap, vplexIngestionMethod);
+                        taskStatusMap, vplexIngestionMethod, context);
             }
             */
             
@@ -160,7 +155,7 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
                     unManagedVolume.forDisplay(), ex.getLocalizedMessage());
         }
         
-        return clazz.cast(volume);
+        return clazz.cast(context.getIngestedVolume());
     }
 
     /**
@@ -181,13 +176,14 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
      * @param clazz class to cast to upon return
      * @param taskStatusMap task status map
      * @param vplexIngestionMethod vplex ingestion method
+     * @param context the RPIngestionContext for this UnManagedVolume
      * @return Volume of a managed RP volume
      */
     private <T extends BlockObject> T ingestBlockObjectsInternal(List<URI> systemCache, List<URI> poolCache, StorageSystem system,
             UnManagedVolume unManagedVolume, VirtualPool vPool, VirtualArray virtualArray, Project project, TenantOrg tenant,
             List<UnManagedVolume> unManagedVolumesSuccessfullyProcessed, Map<String, BlockObject> createdObjectMap,
             Map<String, List<DataObject>> updatedObjectMap, boolean unManagedVolumeExported, Class<T> clazz,
-            Map<String, StringBuffer> taskStatusMap, String vplexIngestionMethod) {
+            Map<String, StringBuffer> taskStatusMap, String vplexIngestionMethod, RPIngestionContext context) {
         String volumeNativeGuid = unManagedVolume.getNativeGuid().replace(VolumeIngestionUtil.UNMANAGEDVOLUME,
                 VolumeIngestionUtil.VOLUME);
         BlockObject blockObject = VolumeIngestionUtil.checkIfVolumeExistsInDB(volumeNativeGuid, _dbClient);
@@ -196,7 +192,7 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
         validateUnManagedVolumeProperties(unManagedVolume, virtualArray, vPool, project);
 
         // Make sure there's an unmanaged protection set
-        UnManagedProtectionSet umpset = getUnManagedProtectionSet(unManagedVolume);
+        UnManagedProtectionSet umpset = context.getUnManagedProtectionSet();
         validateUnmanagedProtectionSet(vPool, unManagedVolume, umpset);
         
         // Test ingestion status message
@@ -214,13 +210,16 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
         volume = performRPVolumeIngestion(project, virtualArray, vPool, system, unManagedVolume, systemCache, poolCache, tenant,
                 unManagedVolumesSuccessfullyProcessed, createdObjectMap, updatedObjectMap, taskStatusMap, vplexIngestionMethod,
                 volume);
+        context.setIngestedVolume(volume);
         
         // Decorate volume with RP Properties.
-        decorateVolumeWithRPProperties(volume, unManagedVolume);
+        decorateVolumeWithRPProperties(context);
 
         // Update the unmanaged protection set
-        decorateUnManagedProtectionSet(umpset, volume, unManagedVolume);
+        decorateUnManagedProtectionSet(context);
 
+        // TODO: etc etc with context object
+        
         // Perform RP-specific export ingestion
         performRPExportIngestion(project, virtualArray, vPool, unManagedVolume, volume); 
 
@@ -260,7 +259,7 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
     private void performAutoIngestOnRemainingVolumes(UnManagedProtectionSet umpset, List<URI> systemCache, List<URI> poolCache, Project project, 
             TenantOrg tenant, List<UnManagedVolume> unManagedVolumesSuccessfullyProcessed, 
             Map<String, BlockObject> createdObjectMap, Map<String, List<DataObject>> updatedObjectMap, boolean unManagedVolumeExported, 
-            Map<String, StringBuffer> taskStatusMap, String vplexIngestionMethod) {
+            Map<String, StringBuffer> taskStatusMap, String vplexIngestionMethod, RPIngestionContext context) {
         // Experimental: Perform automated ingestion of other RP volumes if certain criteria is met.
         // 
         // Criteria:
@@ -434,7 +433,7 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
                     StorageSystem system = _dbClient.queryObject(StorageSystem.class, umv.getStorageSystemUri());
                     ingestBlockObjectsInternal(systemCache, poolCache, system, umv, vpool, varray, project, 
                             tenant, unManagedVolumesSuccessfullyProcessed, createdObjectMap, updatedObjectMap, unManagedVolumeExported, 
-                            Volume.class, taskStatusMap, vplexIngestionMethod);
+                            Volume.class, taskStatusMap, vplexIngestionMethod, context);
                     // If the service or factories put in business logic AFTER calling ingestBlockObjects,
                     // we're going to fall short here.
                 } catch (Exception e) {
@@ -520,7 +519,9 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
      * @param volume volume that is the result of the ingest
      * @param unManagedVolume unmanaged volume with RP properties (VolumeInformation) on it
      */
-    private void decorateVolumeWithRPProperties(Volume volume, UnManagedVolume unManagedVolume) {
+    private void decorateVolumeWithRPProperties(RPIngestionContext context) {
+        UnManagedVolume unManagedVolume = context.getUnManagedVolume();
+        Volume volume = context.getIngestedVolume();
         StringSetMap unManagedVolumeInformation = unManagedVolume.getVolumeInformation();
         String type = PropertySetterUtil.extractValueFromStringSet(
                 SupportedVolumeInformation.RP_PERSONALITY.toString(), unManagedVolumeInformation);
@@ -549,9 +550,9 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
         volume.setInternalSiteName(rpInternalSiteName); // This comes from UNMANAGED_CG discovery of Protection System
         volume.setProtectionController(URI.create(rpProtectionSystem)); // This comes from UNMANAGED_CG discovery of Protection System
         if (null != _dbClient.queryObject(Volume.class, volume.getId())) {
-            _dbClient.updateObject(volume);
+             context.getObjectsToUpdate().add(volume);
         } else {
-            _dbClient.createObject(volume);
+            context.getCreatedObjectMap().put(volume.getNativeGuid(), volume);
         }
     }
 
@@ -702,7 +703,11 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
      * @param volume the managed volume
      * @param unManagedVolume the unmanaged volume
      */
-    private void decorateUnManagedProtectionSet(UnManagedProtectionSet umpset, Volume volume, UnManagedVolume unManagedVolume) {
+    private void decorateUnManagedProtectionSet(RPIngestionContext context) {
+        UnManagedProtectionSet umpset = context.getUnManagedProtectionSet();
+        Volume volume = context.getIngestedVolume();
+        UnManagedVolume unManagedVolume = context.getUnManagedVolume();
+        
         // Add the volume to the list of managed volumes we have so far.
         if (!umpset.getManagedVolumeIds().contains(volume.getId().toString())) {
             umpset.getManagedVolumeIds().add(volume.getId().toString());
@@ -714,7 +719,7 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
         }
 
         // Update the unmanaged protection set object
-        _dbClient.updateObject(umpset);
+        context.getObjectsToUpdate().add(umpset);
     }
     
     /**
@@ -976,25 +981,6 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
         return true;
     }
 
-    /**
-     * Find the unmanaged protection set associated with the unmanaged volume
-     * 
-     * @param unManagedVolume unmanaged volume
-     * @return unmanaged protection set associated with that volume
-     */
-    private UnManagedProtectionSet getUnManagedProtectionSet(UnManagedVolume unManagedVolume) {
-        // Find the UnManagedProtectionSet associated with this unmanaged volume
-        List<UnManagedProtectionSet> umpsets = CustomQueryUtility.getUnManagedProtectionSetByUnManagedVolumeId(_dbClient, unManagedVolume.getId().toString());
-        Iterator<UnManagedProtectionSet> umpsetsItr = umpsets.iterator();
-        if (!umpsetsItr.hasNext()) {
-            _logger.error("Unable to find unmanaged protection set associated with volume: " + unManagedVolume.getId());
-            // caller will throw exception
-            return null;
-        }
-        
-        return umpsetsItr.next();
-    }
-    
     /**
      * Create the managed protection set associated with the ingested RP volumes.
      * Also, as a side-effect, insert the protection set ID into each of the impacted volumes.
