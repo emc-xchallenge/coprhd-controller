@@ -1100,6 +1100,11 @@ public class VdcSiteManager extends AbstractManager {
             return;
         }
         
+        if (!drUtil.isPrimary()) {
+            log.info("This is standby site, no actions needed");
+            return;
+        }
+        
         InterProcessLock lock = null;
         
         try {

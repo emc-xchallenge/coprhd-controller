@@ -40,21 +40,29 @@ public class InternalDRServiceClient extends BaseServiceClient {
         
         SiteErrorResponse errorResponse = resp.getEntity(SiteErrorResponse.class);
         
-        if (SiteErrorResponse.isNoErrorResponse(errorResponse)) {
-            throw APIException.internalServerErrors.failoverPrecheckFailed(standbyUUID, "Standby site is not fully synced");
+        if (SiteErrorResponse.isErrorResponse(errorResponse)) {
+            throw APIException.internalServerErrors.failoverPrecheckFailed(standbyUUID, errorResponse.getErrorMessage());
         }
         
         return SiteErrorResponse.noError();
     }
     
-    public void failover(String newPrimaryUUid) {
+    public SiteErrorResponse failover(String newPrimaryUUid) {
         String getVdcPath = String.format("/site/internal/failover?newPrimaryUUid=%s", newPrimaryUUid);
         WebResource rRoot = createRequest(getVdcPath);
         ClientResponse resp = null;
         try {
             resp = addSignature(rRoot).post(ClientResponse.class);
         } catch (Exception e) {
-            log.warn("Fail to send request to precheck failover", e);
+            log.error("Fail to send request to failover", e);
         }
+        
+        SiteErrorResponse errorResponse = resp.getEntity(SiteErrorResponse.class);
+        
+        if (SiteErrorResponse.isErrorResponse(errorResponse)) {
+            throw APIException.internalServerErrors.failoverFailed(newPrimaryUUid, errorResponse.getErrorMessage());
+        }
+        
+        return SiteErrorResponse.noError();
     }
 }

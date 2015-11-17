@@ -685,7 +685,6 @@ public class DisasterRecoveryService {
                 }
             }
             
-            //reconfig this site itself
             drUtil.updateVdcTargetVersion(uuid, SiteInfo.RECONFIG_RESTART);
             
             auditDisasterRecoveryOps(OperationTypeEnum.FAILOVER, AuditLogManager.AUDITLOG_SUCCESS, null, uuid, currentSite.getVip(), currentSite.getName());
@@ -697,6 +696,11 @@ public class DisasterRecoveryService {
         }
     }
     
+    /**
+     * This is internal API to do precheck for failover
+     * 
+     * @return return response with error message and service code
+     */
     @POST
     @Path("/internal/failoverprecheck")
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
@@ -707,12 +711,12 @@ public class DisasterRecoveryService {
         try {
             precheckForFailover();
         } catch (InternalServerErrorException e) {
-            log.warn("Failed to precheck failover {}", e);
+            log.warn("Failed to precheck failover", e);
             response.setErrorMessage(e.getMessage());
             response.setServiceCode(e.getServiceCode().ordinal());
             return response;
         } catch (Exception e) {
-            log.error("Failed to precheck failover {}", e);
+            log.error("Failed to precheck failover", e);
             response.setErrorMessage(e.getMessage());
             return response;
         }
@@ -720,6 +724,11 @@ public class DisasterRecoveryService {
         return SiteErrorResponse.noError();
     }
     
+    /**
+     * This is internal API to do failover
+     * 
+     * @return return response with error message and service code
+     */
     @POST
     @Path("/internal/failover")
     @Consumes({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
@@ -736,11 +745,8 @@ public class DisasterRecoveryService {
             oldPrimarySite.setState(SiteState.PRIMARY_FAILING_OVER);
             coordinator.persistServiceConfiguration(oldPrimarySite.toConfiguration());
             
-            
-            //set new primary uuid
             coordinator.setPrimarySite(newPrimaryUUid);
             
-            //reconfig this site itself
             drUtil.updateVdcTargetVersion(currentSite.getUuid(), SiteInfo.RECONFIG_RESTART);
             
             auditDisasterRecoveryOps(OperationTypeEnum.FAILOVER, AuditLogManager.AUDITLOG_SUCCESS, null, uuid, currentSite.getVip(), currentSite.getName());

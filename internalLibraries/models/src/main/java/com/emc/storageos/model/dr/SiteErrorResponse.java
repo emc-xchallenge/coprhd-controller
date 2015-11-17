@@ -74,11 +74,11 @@ public class SiteErrorResponse {
         return noError;
     }
     
-    public static boolean isNoErrorResponse(SiteErrorResponse response) {
+    public static boolean isErrorResponse(SiteErrorResponse response) {
         if (response == null)
             return false;
         
-        if (response.getServiceCode() <= 0 && (response.getErrorMessage() == null || response.getErrorMessage().length() == 0)) {
+        if (response.getServiceCode() > 0 && response.getErrorMessage() != null && response.getErrorMessage().length() > 0) {
             return true;
         }
         
