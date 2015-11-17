@@ -660,7 +660,7 @@ public class DisasterRecoveryService {
                 InternalDRServiceClient client = new InternalDRServiceClient(site.getVip());
                 client.setCoordinatorClient(coordinator);
                 client.setKeyGenerator(apiSignatureGenerator);
-                client.failoverPrecheck();
+                client.failoverPrecheck(site.getUuid());
                 clientCacheMap.put(site.getUuid(), client);
             }
         }
@@ -700,12 +700,24 @@ public class DisasterRecoveryService {
     @POST
     @Path("/internal/failoverprecheck")
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
-    public Response failoverPrecheck() {
+    public SiteErrorResponse failoverPrecheck() {
         log.info("Precheck for failover internally");
         
-        precheckForFailover();
+        SiteErrorResponse response = new SiteErrorResponse();
+        try {
+            precheckForFailover();
+        } catch (InternalServerErrorException e) {
+            log.warn("Failed to precheck failover {}", e);
+            response.setErrorMessage(e.getMessage());
+            response.setServiceCode(e.getServiceCode().ordinal());
+            return response;
+        } catch (Exception e) {
+            log.error("Failed to precheck failover {}", e);
+            response.setErrorMessage(e.getMessage());
+            return response;
+        }
         
-        return Response.status(Response.Status.ACCEPTED).build();
+        return SiteErrorResponse.noError();
     }
     
     @POST
@@ -752,7 +764,7 @@ public class DisasterRecoveryService {
                 InternalDRServiceClient client = new InternalDRServiceClient(site.getVip());
                 client.setCoordinatorClient(coordinator);
                 client.setKeyGenerator(apiSignatureGenerator);
-                client.failoverPrecheck();
+                client.failoverPrecheck(site.getUuid());
             }
         }
         return Response.status(Response.Status.ACCEPTED).build();

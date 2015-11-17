@@ -5,7 +5,9 @@ import java.net.URI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.emc.storageos.model.dr.SiteErrorResponse;
 import com.emc.storageos.security.helpers.BaseServiceClient;
+import com.emc.storageos.svcs.errorhandling.resources.APIException;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 
@@ -26,22 +28,31 @@ public class InternalDRServiceClient extends BaseServiceClient {
     }
     
     
-    public void failoverPrecheck() {
+    public SiteErrorResponse failoverPrecheck(String standbyUUID) {
         String getVdcPath = String.format("/site/internal/failoverprecheck");
         WebResource rRoot = createRequest(getVdcPath);
+        ClientResponse resp = null;
         try {
-            addSignature(rRoot).post(ClientResponse.class);
+            resp = addSignature(rRoot).post(ClientResponse.class);
         } catch (Exception e) {
-            log.warn("Fail to send request to precheck failover", e);
+            log.error("Fail to send request to precheck failover", e);
         }
         
+        SiteErrorResponse errorResponse = resp.getEntity(SiteErrorResponse.class);
+        
+        if (SiteErrorResponse.isNoErrorResponse(errorResponse)) {
+            throw APIException.internalServerErrors.failoverPrecheckFailed(standbyUUID, "Standby site is not fully synced");
+        }
+        
+        return SiteErrorResponse.noError();
     }
     
     public void failover(String newPrimaryUUid) {
         String getVdcPath = String.format("/site/internal/failover?newPrimaryUUid=%s", newPrimaryUUid);
         WebResource rRoot = createRequest(getVdcPath);
+        ClientResponse resp = null;
         try {
-            addSignature(rRoot).post(ClientResponse.class);
+            resp = addSignature(rRoot).post(ClientResponse.class);
         } catch (Exception e) {
             log.warn("Fail to send request to precheck failover", e);
         }
