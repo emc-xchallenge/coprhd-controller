@@ -94,10 +94,10 @@ public class DisasterRecoveryService {
     private InternalApiSignatureKeyGenerator apiSignatureGenerator;
     private SiteMapper siteMapper;
     private SysUtils sysUtils;
-    protected CoordinatorClient coordinator;
+    private CoordinatorClient coordinator;
     private DbClient dbClient;
     private IPsecConfig ipsecConfig;
-    protected DrUtil drUtil;
+    private DrUtil drUtil;
     
     @Autowired
     private AuditLogManager auditMgr;
@@ -758,24 +758,6 @@ public class DisasterRecoveryService {
         }
     }
     
-    @POST
-    @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
-    @Path("/{uuid}/test")
-    @CheckPermission(roles = { Role.SECURITY_ADMIN, Role.RESTRICTED_SECURITY_ADMIN }, blockProxies = true)
-    public Response doTest(@PathParam("uuid") String uuid) {
-        List<Site> allStandbySites = drUtil.listStandbySites();
-        
-        for (Site site : allStandbySites) {
-            if (!site.getUuid().equals(uuid)) {
-                InternalDRServiceClient client = new InternalDRServiceClient(site.getVip());
-                client.setCoordinatorClient(coordinator);
-                client.setKeyGenerator(apiSignatureGenerator);
-                client.failoverPrecheck(site.getUuid());
-            }
-        }
-        return Response.status(Response.Status.ACCEPTED).build();
-    }
-
     private Site validateSiteConfig(String uuid) {
         if (!isClusterStable()) {
             log.error("Cluster is unstable");
