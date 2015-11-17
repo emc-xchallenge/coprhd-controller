@@ -28,6 +28,7 @@ import com.emc.storageos.db.client.model.StringSetMap;
 import com.emc.storageos.db.client.model.UnManagedDiscoveredObjects.UnManagedVolume;
 import com.emc.storageos.db.client.model.UnManagedDiscoveredObjects.UnManagedVolume.SupportedVolumeCharacterstics;
 import com.emc.storageos.db.client.model.UnManagedDiscoveredObjects.UnManagedVolume.SupportedVolumeInformation;
+import com.emc.storageos.volumecontroller.IngestionContext;
 import com.emc.storageos.vplex.api.VPlexApiConstants;
 import com.emc.storageos.vplex.api.VPlexApiException;
 import com.emc.storageos.vplex.api.VPlexDeviceInfo;
@@ -40,7 +41,7 @@ import com.emc.storageos.vplex.api.VPlexStorageVolumeInfo;
  * required to discover and ingest a VPLEX virtual volume's
  * backend volumes and related replicas.
  */
-public class VplexBackendIngestionContext {
+public class VplexBackendIngestionContext implements IngestionContext {
 
     private static Logger _logger = LoggerFactory.getLogger(VplexBackendIngestionContext.class);
 
@@ -82,6 +83,7 @@ public class VplexBackendIngestionContext {
     private Map<String, BlockObject> createdObjectMap = new HashMap<String, BlockObject>();
     private Map<String, List<DataObject>> updatedObjectMap = new HashMap<String, List<DataObject>>();
     private List<BlockObject> ingestedObjects = new ArrayList<BlockObject>();
+    private List<UnManagedVolume> unManagedVolumesToBeDeleted = new ArrayList<UnManagedVolume>();
 
     private BackendDiscoveryPerformanceTracker _tracker;
 
@@ -863,44 +865,52 @@ public class VplexBackendIngestionContext {
         return !isLocal();
     }
 
-    /**
-     * Returns the Map of processed UnManagedVolumes, used 
-     * by the general ingestion framework.
-     * 
-     * @return the processed UnManagedVolume Map
+    /* (non-Javadoc)
+     * @see com.emc.storageos.vplexcontroller.IngestionContext#getProcessedUnManagedVolumeMap()
      */
+    @Override
     public Map<String, UnManagedVolume> getProcessedUnManagedVolumeMap() {
         return processedUnManagedVolumeMap;
     }
 
-    /**
-     * Returns the Map of created objects, used 
-     * by the general ingestion framework.
-     * 
-     * @return the created object Map
+    /* (non-Javadoc)
+     * @see com.emc.storageos.vplexcontroller.IngestionContext#getCreatedObjectMap()
      */
+    @Override
     public Map<String, BlockObject> getCreatedObjectMap() {
         return createdObjectMap;
     }
 
-    /**
-     * Returns the Map of updated objects, used 
-     * by the general ingestion framework.
-     * 
-     * @return the updated object Map
+    /* (non-Javadoc)
+     * @see com.emc.storageos.vplexcontroller.IngestionContext#getUpdatedObjectMap()
      */
+    @Override
     public Map<String, List<DataObject>> getUpdatedObjectMap() {
         return updatedObjectMap;
     }
 
-    /**
-     * Returns the Map of ingested objects, used 
-     * by the general ingestion framework.
-     * 
-     * @return the ingested objects Map
+    /* (non-Javadoc)
+     * @see com.emc.storageos.vplexcontroller.IngestionContext#getIngestedObjects()
      */
+    @Override
     public List<BlockObject> getIngestedObjects() {
         return ingestedObjects;
+    }
+
+    /* (non-Javadoc)
+     * @see com.emc.storageos.vplexcontroller.IngestionContext#getUnManagedVolumesToBeDeleted()
+     */
+    @Override
+    public List<UnManagedVolume> getUnManagedVolumesToBeDeleted() {
+        return unManagedVolumesToBeDeleted;
+    }
+
+    /* (non-Javadoc)
+     * @see com.emc.storageos.vplexcontroller.IngestionContext#rollback()
+     */
+    @Override
+    public void rollback() {
+        _logger.info("rollback not implemented for VPLEX volume ingestion.");
     }
 
     /**
@@ -1269,12 +1279,10 @@ public class VplexBackendIngestionContext {
         }
     }
 
-    /**
-     * Returns a detailed report on the state of everything in this context,
-     * useful for debugging.
-     * 
-     * @return a detailed report on the context
+    /* (non-Javadoc)
+     * @see com.emc.storageos.vplexcontroller.IngestionContext#toStringDebug()
      */
+    @Override
     public String toStringDebug() {
         StringBuilder s = new StringBuilder("\n\nVplexBackendIngestionContext \n\t ");
         s.append("unmanaged virtual volume: ").append(this._unmanagedVirtualVolume).append(" \n\t ");
