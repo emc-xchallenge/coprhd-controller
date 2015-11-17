@@ -129,7 +129,6 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
         RPIngestionContext context = new RPIngestionContext(unManagedVolume, _dbClient);
 
         try {
-            context.validate();
             
             ingestBlockObjectsInternal(systemCache, poolCache, system, unManagedVolume, vPool, virtualArray, project, tenant,
                     unManagedVolumesSuccessfullyProcessed, createdObjectMap, updatedObjectMap, unManagedVolumeExported, clazz, taskStatusMap,
@@ -184,6 +183,9 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
             List<UnManagedVolume> unManagedVolumesSuccessfullyProcessed, Map<String, BlockObject> createdObjectMap,
             Map<String, List<DataObject>> updatedObjectMap, boolean unManagedVolumeExported, Class<T> clazz,
             Map<String, StringBuffer> taskStatusMap, String vplexIngestionMethod, RPIngestionContext context) {
+        
+        context.validate();
+        
         String volumeNativeGuid = unManagedVolume.getNativeGuid().replace(VolumeIngestionUtil.UNMANAGEDVOLUME,
                 VolumeIngestionUtil.VOLUME);
         BlockObject blockObject = VolumeIngestionUtil.checkIfVolumeExistsInDB(volumeNativeGuid, _dbClient);
