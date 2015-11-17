@@ -36,6 +36,7 @@ public class InternalDRServiceClient extends BaseServiceClient {
             resp = addSignature(rRoot).post(ClientResponse.class);
         } catch (Exception e) {
             log.error("Fail to send request to precheck failover", e);
+            throw APIException.internalServerErrors.failoverPrecheckFailed(standbyUUID, String.format("Can't connect to standby to do precheck for failover, %s", e.getMessage()));
         }
         
         SiteErrorResponse errorResponse = resp.getEntity(SiteErrorResponse.class);
@@ -47,22 +48,15 @@ public class InternalDRServiceClient extends BaseServiceClient {
         return SiteErrorResponse.noError();
     }
     
-    public SiteErrorResponse failover(String newPrimaryUUid) {
+    public void failover(String newPrimaryUUid) {
         String getVdcPath = String.format("/site/internal/failover?newPrimaryUUid=%s", newPrimaryUUid);
         WebResource rRoot = createRequest(getVdcPath);
-        ClientResponse resp = null;
+        
         try {
-            resp = addSignature(rRoot).post(ClientResponse.class);
+            addSignature(rRoot).post(ClientResponse.class);
         } catch (Exception e) {
             log.error("Fail to send request to failover", e);
         }
         
-        SiteErrorResponse errorResponse = resp.getEntity(SiteErrorResponse.class);
-        
-        if (SiteErrorResponse.isErrorResponse(errorResponse)) {
-            throw APIException.internalServerErrors.failoverFailed(newPrimaryUUid, errorResponse.getErrorMessage());
-        }
-        
-        return SiteErrorResponse.noError();
     }
 }
