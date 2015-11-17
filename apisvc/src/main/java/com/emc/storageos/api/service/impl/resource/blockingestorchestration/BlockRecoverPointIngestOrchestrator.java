@@ -58,6 +58,7 @@ import com.emc.storageos.db.client.model.UnManagedDiscoveredObjects.UnManagedVol
 import com.emc.storageos.db.client.model.UnManagedDiscoveredObjects.UnManagedVolume.SupportedVolumeInformation;
 import com.emc.storageos.db.client.util.CustomQueryUtility;
 import com.emc.storageos.model.block.VolumeExportIngestParam;
+import com.emc.storageos.protectioncontroller.impl.recoverpoint.RPIngestionContext;
 import com.emc.storageos.util.ExportUtils;
 
 /**
@@ -119,28 +120,40 @@ public class BlockRecoverPointIngestOrchestrator extends BlockIngestOrchestrator
             VirtualPool vPool, VirtualArray virtualArray, Project project, TenantOrg tenant, List<UnManagedVolume> unManagedVolumesSuccessfullyProcessed, 
             Map<String, BlockObject> createdObjectMap, Map<String, List<DataObject>> updatedObjectMap, boolean unManagedVolumeExported, Class<T> clazz, 
             Map<String, StringBuffer> taskStatusMap, String vplexIngestionMethod) throws IngestionException {
-        // Make sure there's an unmanaged protection set
-        UnManagedProtectionSet umpset = getUnManagedProtectionSet(unManagedVolume);
-        if (umpset == null) {
-            _logger.warn("No unmanaged protection set could be found for unmanaged volume: " + unManagedVolume.getNativeGuid() + " Please run unmanaged CG discovery of registered protection system");
-            throw IngestionException.exceptions.unManagedProtectionSetNotFound(unManagedVolume.getNativeGuid());
-        }
+        RPIngestionContext context = new RPIngestionContext();
+        Volume volume = null;
+        
+        try {
+            // Make sure there's an unmanaged protection set
+            UnManagedProtectionSet umpset = getUnManagedProtectionSet(unManagedVolume);
+            if (umpset == null) {
+                _logger.warn("No unmanaged protection set could be found for unmanaged volume: " + unManagedVolume.getNativeGuid() + " Please run unmanaged CG discovery of registered protection system");
+                throw IngestionException.exceptions.unManagedProtectionSetNotFound(unManagedVolume.getNativeGuid());
+            }
 
-        Volume volume = (Volume)ingestBlockObjectsInternal(systemCache, poolCache, system, unManagedVolume, vPool, virtualArray, project, tenant,
-                unManagedVolumesSuccessfullyProcessed, createdObjectMap, updatedObjectMap, unManagedVolumeExported, clazz, taskStatusMap,
-                vplexIngestionMethod);
-        
-        // Reload the unmanaged protection set after ingestion
-        umpset = _dbClient.queryObject(UnManagedProtectionSet.class, umpset.getId());
-        
-        // Experimental auto-ingestion feature.  Only run it if we haven't ingested everything yet.
-        /*
-        if (!validateAllVolumesInCGIngested(unManagedVolume, umpset)) {
-            performAutoIngestOnRemainingVolumes(umpset, systemCache, poolCache, project, tenant,
-                    unManagedVolumesSuccessfullyProcessed, createdObjectMap, updatedObjectMap, unManagedVolumeExported,
-                    taskStatusMap, vplexIngestionMethod);
+            volume = (Volume)ingestBlockObjectsInternal(systemCache, poolCache, system, unManagedVolume, vPool, virtualArray, project, tenant,
+                    unManagedVolumesSuccessfullyProcessed, createdObjectMap, updatedObjectMap, unManagedVolumeExported, clazz, taskStatusMap,
+                    vplexIngestionMethod);
+            
+            // Reload the unmanaged protection set after ingestion
+            umpset = _dbClient.queryObject(UnManagedProtectionSet.class, umpset.getId());
+            
+            // Experimental auto-ingestion feature.  Only run it if we haven't ingested everything yet.
+            /*
+            if (!validateAllVolumesInCGIngested(unManagedVolume, umpset)) {
+                performAutoIngestOnRemainingVolumes(umpset, systemCache, poolCache, project, tenant,
+                        unManagedVolumesSuccessfullyProcessed, createdObjectMap, updatedObjectMap, unManagedVolumeExported,
+                        taskStatusMap, vplexIngestionMethod);
+            }
+            */
+            
+            context.commit();
+        } catch (Exception ex) {
+            _logger.error("Exception encountered during RecoverPoint ingestion.", ex);
+            context.rollback();
+            throw IngestionException.exceptions.generalVolumeException(
+                    unManagedVolume.forDisplay(), ex.getLocalizedMessage());
         }
-        */
         
         return clazz.cast(volume);
     }

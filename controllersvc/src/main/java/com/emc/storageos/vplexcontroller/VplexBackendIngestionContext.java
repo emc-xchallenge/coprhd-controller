@@ -913,6 +913,15 @@ public class VplexBackendIngestionContext implements IngestionContext {
         _logger.info("rollback not implemented for VPLEX volume ingestion.");
     }
 
+    /* (non-Javadoc)
+     * @see com.emc.storageos.volumecontroller.IngestionContext#commit()
+     */
+    @Override
+    public void commit() {
+        // TODO Auto-generated method stub
+        
+    }
+
     /**
      * Returns the Project to be used for backend resources.
      * 

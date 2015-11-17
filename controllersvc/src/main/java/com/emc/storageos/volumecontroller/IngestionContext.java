@@ -49,6 +49,11 @@ public interface IngestionContext {
     public abstract List<BlockObject> getIngestedObjects();
 
     /**
+     * Commits any changes within this context.
+     */
+    public abstract void commit();
+
+    /**
      * Rolls back any changes within this context idempotently.
      */
     public abstract void rollback();
