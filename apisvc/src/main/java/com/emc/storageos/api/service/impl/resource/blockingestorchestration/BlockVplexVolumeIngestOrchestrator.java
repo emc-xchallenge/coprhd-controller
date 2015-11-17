@@ -53,6 +53,7 @@ import com.emc.storageos.db.client.util.CustomQueryUtility;
 import com.emc.storageos.db.client.util.NullColumnValueGetter;
 import com.emc.storageos.model.block.VolumeExportIngestParam;
 import com.emc.storageos.util.ConnectivityUtil;
+import com.emc.storageos.volumecontroller.IngestionContext;
 import com.emc.storageos.volumecontroller.impl.ControllerUtils;
 import com.emc.storageos.vplexcontroller.VPlexControllerUtils;
 import com.emc.storageos.vplexcontroller.VplexBackendIngestionContext;
@@ -772,7 +773,7 @@ public class BlockVplexVolumeIngestOrchestrator extends BlockVolumeIngestOrchest
      * 
      * @param context the VplexBackendIngestionContext
      */
-    private void handleBackendPersistence(VplexBackendIngestionContext context) {
+    private void handleBackendPersistence(IngestionContext context) {
         _dbClient.createObject(context.getIngestedObjects());
         _dbClient.createObject(context.getCreatedObjectMap().values());
         for (List<DataObject> dos : context.getUpdatedObjectMap().values()) {
