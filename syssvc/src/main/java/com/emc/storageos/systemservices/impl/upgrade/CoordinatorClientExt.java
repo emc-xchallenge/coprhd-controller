@@ -15,10 +15,7 @@ import static com.emc.storageos.coordinator.client.model.Constants.TARGET_INFO;
 import static com.emc.storageos.coordinator.client.model.Constants.TARGET_INFO_LOCK;
 import static com.emc.storageos.systemservices.mapper.ClusterInfoMapper.toClusterInfo;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.Socket;
 import java.net.URI;
 import java.text.MessageFormat;
@@ -30,31 +27,20 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-import java.util.Set;
 
+import org.apache.curator.framework.recipes.barriers.DistributedDoubleBarrier;
 import org.apache.curator.framework.recipes.locks.InterProcessLock;
 import org.apache.zookeeper.ZooKeeper.States;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.emc.storageos.coordinator.client.model.Constants;
-import com.emc.storageos.coordinator.client.service.impl.CoordinatorClientImpl;
-import com.emc.storageos.coordinator.common.impl.ZkConnection;
-import com.emc.storageos.db.common.DbConfigConstants;
 import com.emc.storageos.coordinator.client.model.ConfigVersion;
-import com.emc.storageos.coordinator.common.Configuration;
-import com.emc.storageos.services.util.Strings;
-import com.emc.storageos.coordinator.common.Service;
-import com.emc.storageos.coordinator.common.impl.ConfigurationImpl;
-import com.emc.storageos.coordinator.common.impl.ServiceImpl;
-import com.emc.storageos.coordinator.client.service.CoordinatorClient;
-import com.emc.storageos.coordinator.client.service.CoordinatorClient.LicenseType;
-import com.emc.storageos.coordinator.client.service.DistributedPersistentLock;
-import com.emc.storageos.coordinator.client.service.DrUtil;
+import com.emc.storageos.coordinator.client.model.Constants;
 import com.emc.storageos.coordinator.client.model.CoordinatorClassInfo;
 import com.emc.storageos.coordinator.client.model.CoordinatorSerializable;
 import com.emc.storageos.coordinator.client.model.PowerOffState;
@@ -62,11 +48,23 @@ import com.emc.storageos.coordinator.client.model.PropertyInfoExt;
 import com.emc.storageos.coordinator.client.model.RepositoryInfo;
 import com.emc.storageos.coordinator.client.model.Site;
 import com.emc.storageos.coordinator.client.model.SoftwareVersion;
+import com.emc.storageos.coordinator.client.service.CoordinatorClient;
+import com.emc.storageos.coordinator.client.service.CoordinatorClient.LicenseType;
+import com.emc.storageos.coordinator.client.service.DistributedPersistentLock;
+import com.emc.storageos.coordinator.client.service.DrUtil;
+import com.emc.storageos.coordinator.client.service.impl.CoordinatorClientImpl;
+import com.emc.storageos.coordinator.common.Configuration;
+import com.emc.storageos.coordinator.common.Service;
+import com.emc.storageos.coordinator.common.impl.ConfigurationImpl;
+import com.emc.storageos.coordinator.common.impl.ServiceImpl;
+import com.emc.storageos.coordinator.common.impl.ZkConnection;
 import com.emc.storageos.coordinator.exceptions.CoordinatorException;
+import com.emc.storageos.db.common.DbConfigConstants;
 import com.emc.storageos.db.common.DbServiceStatusChecker;
 import com.emc.storageos.model.property.PropertiesMetadata;
 import com.emc.storageos.model.property.PropertyInfo;
 import com.emc.storageos.model.property.PropertyMetadata;
+import com.emc.storageos.services.util.Strings;
 import com.emc.storageos.svcs.errorhandling.resources.APIException;
 import com.emc.storageos.systemservices.exceptions.CoordinatorClientException;
 import com.emc.storageos.systemservices.exceptions.InvalidLockOwnerException;
@@ -77,9 +75,6 @@ import com.emc.storageos.systemservices.impl.client.SysClientFactory.SysClient;
 import com.emc.vipr.model.sys.ClusterInfo;
 import com.emc.vipr.model.sys.ClusterInfo.ClusterState;
 import com.google.common.collect.ImmutableSet;
-
-import org.apache.commons.lang.StringUtils;
-import org.apache.curator.framework.recipes.barriers.DistributedDoubleBarrier;
 
 public class CoordinatorClientExt {
     private static final Logger _log = LoggerFactory.getLogger(CoordinatorClientExt.class);
@@ -1406,6 +1401,11 @@ public class CoordinatorClientExt {
         private DrUtil drUtil = new DrUtil(_coordinator);
         
         public void run() {
+            if (drUtil.isPrimary()) {
+                _log.info("This is primary site now, no need to run coordinator monitor");
+                return;
+            }
+            
             String state = drUtil.getLocalCoordinatorMode(getMyNodeId());
             if (DrUtil.ZOOKEEPER_MODE_OBSERVER.equals(state)) {
                 return; // expected situation. Standby zookeeper should be observer mode normally

@@ -48,7 +48,6 @@ import com.emc.storageos.coordinator.client.service.DrUtil;
 import com.emc.storageos.coordinator.client.service.impl.CoordinatorClientInetAddressMap;
 import com.emc.storageos.coordinator.common.Configuration;
 import com.emc.storageos.coordinator.common.impl.ConfigurationImpl;
-import com.emc.storageos.coordinator.common.impl.ServiceImpl;
 import com.emc.storageos.coordinator.exceptions.CoordinatorException;
 import com.emc.storageos.db.client.impl.DbClientContext;
 import com.emc.storageos.db.client.impl.DbClientImpl;
@@ -606,7 +605,7 @@ public class DisasterRecoveryServiceTest {
         doReturn("leader").when(drUtil).getLocalCoordinatorMode("vipr1");
         doReturn(addrLookupMap).when(coordinator).getInetAddessLookupMap();
         
-        drService.precheckForFailover("site-uuid-2");
+        drService.precheckForFailover();
     }
     
     @Test
@@ -615,7 +614,7 @@ public class DisasterRecoveryServiceTest {
         // API should be only send to local site 
         try {
             doReturn(standbySite2).when(drUtil).getLocalSite();
-            drService.precheckForFailover("site-uuid-1");
+            drService.precheckForFailover();
             fail();
         } catch (InternalServerErrorException e) {
           //ignore
@@ -625,7 +624,7 @@ public class DisasterRecoveryServiceTest {
         try {
             doReturn(standbySite1).when(drUtil).getLocalSite();
             standbySite1.setState(SiteState.STANDBY_ERROR);
-            drService.precheckForFailover("site-uuid-1");
+            drService.precheckForFailover();
             fail();
         } catch (InternalServerErrorException e) {
           //ignore
@@ -635,7 +634,7 @@ public class DisasterRecoveryServiceTest {
         try {
             standbySite1.setState(SiteState.STANDBY_SYNCED);
             doReturn(true).when(drUtil).isPrimary();
-            drService.precheckForFailover("site-uuid-1");
+            drService.precheckForFailover();
             fail();
         } catch (InternalServerErrorException e) {
             //ignore
@@ -645,7 +644,7 @@ public class DisasterRecoveryServiceTest {
         try {
             doReturn(false).when(drUtil).isPrimary();
             doReturn(ClusterInfo.ClusterState.DEGRADED).when(coordinator).getControlNodesState(standbySite1.getUuid(), 1);
-            drService.precheckForFailover("site-uuid-1");
+            drService.precheckForFailover();
             fail();
         } catch (InternalServerErrorException e) {
             //ignore
@@ -660,7 +659,7 @@ public class DisasterRecoveryServiceTest {
             doReturn(ClusterInfo.ClusterState.STABLE).when(coordinator).getControlNodesState(standbySite1.getUuid(), 1);
             doReturn("observer").when(drUtil).getLocalCoordinatorMode("vipr1");
             
-            drService.precheckForFailover("site-uuid-1");
+            drService.precheckForFailover();
             fail();
         } catch (InternalServerErrorException e) {
             //ignore
