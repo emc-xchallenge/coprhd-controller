@@ -36,6 +36,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.Set;
 
+import jline.internal.Log;
+
 import org.apache.curator.framework.recipes.locks.InterProcessLock;
 import org.apache.zookeeper.ZooKeeper.States;
 import org.slf4j.Logger;
@@ -1406,6 +1408,11 @@ public class CoordinatorClientExt {
         private DrUtil drUtil = new DrUtil(_coordinator);
         
         public void run() {
+            if (drUtil.isPrimary()) {
+                _log.info("This is primary site now, no need to run coordinator monitor");
+                return;
+            }
+            
             String state = drUtil.getLocalCoordinatorMode(getMyNodeId());
             if (DrUtil.ZOOKEEPER_MODE_OBSERVER.equals(state)) {
                 return; // expected situation. Standby zookeeper should be observer mode normally
