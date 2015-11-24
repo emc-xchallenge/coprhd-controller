@@ -4,10 +4,12 @@
  */
 package com.emc.storageos.management.backup;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.net.MalformedURLException;
 import java.text.Format;
 import java.text.SimpleDateFormat;
@@ -456,11 +458,18 @@ public class BackupOps {
             return;
         }
         File infoFile = new File(targetDir, backupTag + BackupConstants.BACKUP_INFO_SUFFIX);
-        try (OutputStream fos = new FileOutputStream(infoFile)) {
-            Properties properties = new Properties();
-            properties.setProperty(BackupConstants.BACKUP_INFO_VERSION, getCurrentVersion());
-            properties.setProperty(BackupConstants.BACKUP_INFO_HOSTS, getHostsWithDualInetAddrs().values().toString());
-            properties.store(fos, null);
+        try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(infoFile)))) {
+            bw.write("#" + new Date().toString());
+            bw.newLine();
+            StringBuffer sb = new StringBuffer(BackupConstants.BACKUP_INFO_VERSION).append("=").
+                    append(getCurrentVersion());
+            bw.write(sb.toString());
+            bw.newLine();
+            sb = new StringBuffer(BackupConstants.BACKUP_INFO_HOSTS).append("=").
+                    append(getHostsWithDualInetAddrs().values().toString());
+            bw.write(sb.toString());
+            bw.newLine();
+            bw.flush();
             // Guarantee ower/group owner/permissions of infoFile is consistent with other backup files
             FileUtils.chown(infoFile, BackupConstants.STORAGEOS_USER, BackupConstants.STORAGEOS_GROUP);
             FileUtils.chmod(infoFile, BACKUP_FILE_PERMISSION);
