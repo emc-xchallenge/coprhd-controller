@@ -156,6 +156,12 @@ _get_subnet_ipvx(){
     echo ${outArray[@]}
 }
 
+_get_vipr_version() {
+    local version=`cat /opt/storageos/etc/product`
+    _print_status "ViPR Version" "[$version]"
+
+
+}
 _ntp_get_servers() {
     local ntp_conf="/etc/ntp.conf"
     [ -f "${ntp_conf}" ] && while read server ipaddr dummy ; do
@@ -868,6 +874,49 @@ _test_cpu_usage() {
     [ $VERBOSE = true ] && _verbose "cpu_util_percentage=${cpuUtilPerc}%"
 }
 
+_test_out_of_memory() {
+    local status
+    local testResult
+    local oomFileName="hprof"
+    testResult=`ls /var/log | grep ${oomFileName}`
+    if [ -z "$testResult" ]; then
+        status="[NOT HAPPENED]"
+    else
+        status="[HAPPENED]"
+    fi
+    _print_status "Service Out of Memory" $status
+
+    [ ${VERBOSE} == false ] && return 0
+    for svc in apisvc authsvc controllersvc coordinatorsvc dbsvc geodbsvc geosvc portalsvc sasvc syssvc vasasvc
+    do
+        testResult=`ls /var/log | grep ${oomFileName} | grep ${svc}`
+        if [ -n "$testResult" ]; then
+            _verbose "${svc}: OUT OF MEMORY"
+        fi
+    done
+}
+
+_test_cluster_state() {
+    local status
+    local testResult
+    testResult=`/opt/storageos/bin/nodetool status | grep DN`
+    if [ -z "$testResult" ]; then
+        status="[OK]"
+    else
+        status="[NODE DOWN]"
+    fi
+    _print_status "Cluster State" $status
+
+    [ ${VERBOSE} == false ] && return 0
+    testResult=`/opt/storageos/bin/nodetool status | grep DN | awk '{print $2}'`
+    if [ -n "$testResult" ]; then
+        for node in "$testResult"
+        do
+            _verbose "${node} DOWN"
+        done
+    fi
+}
+
 # Tests the  disk usage.
 # Status:
 #    DATA_FULL,ROOT_FULL - if disk (root, data) available size is 0
@@ -1427,4 +1476,7 @@ _test_connectemc
 _test_disk_space
 _test_memory
 _test_cpu_usage
+_test_cluster_state
+_get_vipr_version
+_test_out_of_memory
 exit 0
