@@ -775,7 +775,7 @@ public class SchemaUtil {
         vdc.setRepStatus(VirtualDataCenter.GeoReplicationStatus.REP_NONE);
         vdc.setVersion(new Date().getTime()); // timestamp
         vdc.setHostCount(_vdcHosts.size());
-        vdc.setApiEndpoint(_vdcEndpoint);
+        vdc.setApiEndpoint(DualInetAddress.normalizeInet6Address(_vdcEndpoint));
 
         CoordinatorClientInetAddressMap nodeMap = _coordinator.getInetAddessLookupMap();
         Map<String, DualInetAddress> controlNodes = nodeMap.getControllerNodeIPLookupMap();
