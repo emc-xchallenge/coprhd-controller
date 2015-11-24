@@ -5,6 +5,7 @@
 
 package com.emc.storageos.geo.vdccontroller.impl;
 
+import java.net.Inet6Address;
 import java.net.URI;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -275,6 +276,14 @@ public class ConnectVdcTaskOp extends AbstractVdcTaskOp {
             } catch (UnknownHostException e) {
                 throw GeoException.fatals.invalidFQDNEndPoint(vdcInfo.getProperty(GeoServiceJob.VDC_NAME), virtualIP);
             }
+        }
+
+        // normalize to full form if it's an IPv6 address
+        InetAddress addr = InetAddresses.forString(virtualIP);
+        if (addr instanceof Inet6Address) {
+            virtualIP = ((Inet6Address)addr).getHostAddress();
+            vdcInfo.setProperty(GeoServiceJob.VDC_API_ENDPOINT, virtualIP); // replace with full form
+            log.info("virtual ip of new vdc {}", virtualIP);
         }
 
         if (vdcResp.getHostIPv4AddressesMap().containsValue(virtualIP) || vdcResp.getHostIPv6AddressesMap().containsValue(virtualIP)) {
