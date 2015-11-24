@@ -1913,7 +1913,7 @@
         reconfigRequired : false,
         rebootRequired : false,
         controlNodeOnly : true,
-        value : "10080"
+        value : "43200"
     },
     {
         key : "internal_api_key_algo",
