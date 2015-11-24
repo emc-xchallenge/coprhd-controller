@@ -708,8 +708,13 @@ public class SchemaUtil {
         // Check VIP
         if (_vdcEndpoint != null && !_vdcEndpoint.equals(vdc.getApiEndpoint())) {
             changed = true;
-            vdc.setApiEndpoint(_vdcEndpoint);
-            _log.info("Vdc vip changed to {}", _vdcEndpoint);
+            try {
+                String vdcEndpoint = DualInetAddress.fromAddress(_vdcEndpoint).toString();
+                vdc.setApiEndpoint(vdcEndpoint);
+                _log.info("Vdc vip changed to {}", vdcEndpoint);
+            } catch (Exception e) {
+                _log.error("Failed to change vdc vip", e);
+            }
         }
 
         if (changed) {
@@ -775,7 +780,7 @@ public class SchemaUtil {
         vdc.setRepStatus(VirtualDataCenter.GeoReplicationStatus.REP_NONE);
         vdc.setVersion(new Date().getTime()); // timestamp
         vdc.setHostCount(_vdcHosts.size());
-        vdc.setApiEndpoint(_vdcEndpoint);
+        vdc.setApiEndpoint(DualInetAddress.fromAddress(_vdcEndpoint).toString());
 
         CoordinatorClientInetAddressMap nodeMap = _coordinator.getInetAddessLookupMap();
         Map<String, DualInetAddress> controlNodes = nodeMap.getControllerNodeIPLookupMap();
