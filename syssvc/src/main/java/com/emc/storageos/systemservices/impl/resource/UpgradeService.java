@@ -28,6 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.emc.storageos.management.backup.BackupOps;
+import com.emc.storageos.services.util.TimeUtils;
 import com.emc.storageos.coordinator.client.model.DownloadingInfo;
 import com.emc.vipr.model.sys.NodeProgress.DownloadStatus;
 import com.emc.storageos.coordinator.client.model.RepositoryInfo;
@@ -69,6 +71,8 @@ public class UpgradeService {
     private SecretsManager _secretsManager;
     @Autowired
     private PropertyManager _propertyManager;
+    @Autowired
+    private BackupOps backupOps;
 
     /**
      * Callback for other components to register itself for upgrade check before upgrade process starts.
@@ -140,6 +144,16 @@ public class UpgradeService {
                 voter.isOKForUpgrade(current.toString(), version);
             }
         }
+
+        try {
+            long backupTime = TimeUtils.getCurrentTime();
+            String backupTag = String.format("CreateBackBeforeUpgrade-%s-%s", current.toString(), backupTime);
+            backupOps.createBackup(backupTag, true);
+        } catch (Exception e) {
+            _log.error("Failed to create backup before upgrading", e);
+            throw APIException.internalServerErrors.createObjectError("Backup creation", e);
+        }
+
         try {
             _coordinator.setTargetInfo(new RepositoryInfo(targetVersion,
                     _coordinator.getTargetInfo(RepositoryInfo.class).getVersions()));
