@@ -156,6 +156,11 @@ _get_subnet_ipvx(){
     echo ${outArray[@]}
 }
 
+_get_software_version() {
+    local version=`cat /opt/storageos/etc/product`
+    _print_status "Software Version" "[$version]"
+}
+
 _ntp_get_servers() {
     local ntp_conf="/etc/ntp.conf"
     [ -f "${ntp_conf}" ] && while read server ipaddr dummy ; do
@@ -840,6 +845,29 @@ _test_memory() {
     [ ${VERBOSE} = true ] && _memory_details_report
 }
 
+_test_service_oom() {
+    local status
+    local oomFileName="*.hprof"
+
+    local oomFileCount=`find -name ${oomFileName} | wc -l`
+    if [ $oomFileCount -eq 0 ]; then
+        status="[NOT HAPPENED]"
+    else
+        status="[HAPPENED]"
+    fi
+
+    _print_status "Service Out of Memory" $status
+    [ ${VERBOSE} == false ] && return 0
+
+    for svc in apisvc authsvc controllersvc coordinatorsvc dbsvc geodbsvc geosvc portalsvc sasvc syssvc vasasvc
+    do
+        oomFileCount=`find -name ${oomFileName} | grep ${svc} | wc -l`
+        if [ "$oomFileCount" -ne 0 ]; then
+            _verbose "${svc}: OUT OF MEMORY"
+        fi
+    done
+}
+
 # Tests cpu usage
 # Status:
 #    FULL - if cpu util percentage reaches 100
@@ -866,6 +894,29 @@ _test_cpu_usage() {
     }')
     _print_status "CPU usage" $cpuStatus
     [ $VERBOSE = true ] && _verbose "cpu_util_percentage=${cpuUtilPerc}%"
+}
+
+_test_cluster_status() {
+    local status
+    local nodeCount=`/etc/systool --getprops | awk -F '=' '/\<node_count\>/ {print $2}'`
+    local goodNodeCount=`/opt/storageos/bin/nodetool status | grep "UN" | wc -l`
+
+    if [ "$goodNodeCount" -eq "$nodeCount" ]; then
+        status="[STABLE]"
+    else
+        status="[DEGRADED]"
+    fi
+
+    _print_status "Cluster State" $status
+    [ ${VERBOSE} == false ] && return 0
+
+    unavailableNodes=`/opt/storageos/bin/nodetool status | grep "DN" | awk '{print $2}'`
+    if [ -n "$unavailableNodes" ]; then
+        for node in "$unavailableNodes"
+        do
+            _verbose "${node}: DOWN"
+        done
+    fi
 }
 
 # Tests the  disk usage.
@@ -1426,5 +1477,8 @@ _test_repository
 _test_connectemc
 _test_disk_space
 _test_memory
+_test_service_oom
 _test_cpu_usage
+_test_cluster_status
+_get_software_version
 exit 0
