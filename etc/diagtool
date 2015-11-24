@@ -1388,7 +1388,12 @@ _check_resource_allocation() {
     [ $VERBOSE = true ] && _verbose ${verbose_output}
 }
 
+_test_vipr_ver() {
+    _print_status "ViPR Version" ${GENCONFIG_LIST}
+}
+
 GENCONFIG_PROPS=$(/etc/systool --getprops) 
+GENCONFIG_LIST=$(/etc/systool --list)
 case ${#} in
     0) ;;         
     1) case ${1} in
@@ -1427,4 +1432,6 @@ _test_connectemc
 _test_disk_space
 _test_memory
 _test_cpu_usage
+# ViPR version information
+_test_vipr_ver
 exit 0
