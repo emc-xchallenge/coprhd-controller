@@ -25,6 +25,8 @@ public class BackupDataTable extends DataTable {
 				"render.uploadProgress");
 		addColumn("upload").setSearchable(false).setRenderFunction(
 				"render.uploadBtn");
+	      addColumn("uploadTest").setSearchable(false).setRenderFunction(
+	                "render.uploadTestBtn");
 		sortAllExcept("upload", "uploadstatus");
 		setDefaultSort("name", "asc");
 		setRowCallback("createRowLink");

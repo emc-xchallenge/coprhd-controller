@@ -21,6 +21,14 @@ render.uploadBtn = function(o, val) {
 	}
 }
 
+render.uploadTestBtn = function(o, val) {
+    var odata = o.aData;
+    var name= odata.name;
+    var url = #{jsAction @uploadTest()/};
+    var href = url(odata);
+    return "<a id='" + val+"BtnId" + "' href='" + href + "' " +"  class=\"btn btn-default btn-xs\">" + "UploadTest" + "</a>";
+}
+
 render.uploadProgressIcon = function(o, val) {
 	 if (!o) {
 	        return "";

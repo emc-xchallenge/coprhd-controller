@@ -1,0 +1,22 @@
+%{
+  titleKey = 'BackupForm.title';
+}%
+#{extends 'nonav-wide-layout.html' /}
+#{set 'title'}&{titleKey}#{/set}
+
+#{set 'moreStyles'}
+#{get 'moreStyles'/}
+<style>
+.no-nav .wide-box {
+    width: 600px;
+}
+</style>
+#{/set}
+
+#{set 'moreScripts'}
+#{get 'moreScripts'/}
+
+#{/set}
+
+#{Form.header titleKey:titleKey/}
+<p>ftp test result: ${result} </p>
