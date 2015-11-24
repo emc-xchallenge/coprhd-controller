@@ -434,17 +434,33 @@ public class ControlService {
         if (_coordinator.isMyDbSvcGood(Constants.DBSVC_NAME) && _coordinator.isMyDbSvcGood(Constants.GEODBSVC_NAME)) {
             return getDbRepairStatusFromLocalNode();
         } else {
-            URI endpoint = _coordinator.getNodeEndpointWithGoodDbsvc();
-            _log.info("Dbsvc/Geodbsvc on current node is not started yet, swith to another syssvc endpoint " + endpoint);
-            if (endpoint == null) {
-                throw APIException.internalServerErrors.sysClientError("No valid syssvc endpoint for db repair status check");
-            }
-            try {
-                return SysClientFactory.getSysClient(endpoint)
+            final int nrOfRetry = 5;
+            DbRepairStatus dbRepairStatus = null;
+            for (int i = 0; i < nrOfRetry; i++) {
+                _log.info("Try several times to get RepairStatus from other nodes. Try :  {} time of total {} times. ", i, nrOfRetry);
+                URI endpoint = _coordinator.getNodeEndpointWithGoodDbsvc();
+                _log.info("Dbsvc/Geodbsvc on current node is not started yet, swith to another syssvc endpoint " + endpoint);
+                if (endpoint == null) {
+                    throw APIException.internalServerErrors.sysClientError("No valid syssvc endpoint for db repair status check");
+                }
+                try {
+                    dbRepairStatus = SysClientFactory.getSysClient(endpoint)
                         .get(SysClientFactory.URI_GET_DBREPAIR_STATUS, DbRepairStatus.class, null);
-            } catch (SysClientException e) {
+                    if (dbRepairStatus.getStatus() != DbRepairStatus.Status.UNKNOWN) {
+                        break;
+                    }
+                } catch (SysClientException e) {
+                    throw APIException.internalServerErrors.sysClientError("db repair status");
+                }
+                int sleepDuration = 1 << i;
+                final long SECONDS = 1000L;
+                _log.info("Sleep {} seconds to execute next try.", sleepDuration);
+                Thread.sleep(sleepDuration * SECONDS);
+            }
+            if (dbRepairStatus == null || dbRepairStatus.getStatus() ==  DbRepairStatus.Status.UNKNOWN) {
                 throw APIException.internalServerErrors.sysClientError("db repair status");
             }
+            return dbRepairStatus;
         }
     }
 

@@ -926,14 +926,18 @@ public class RecoveryManager implements Runnable {
     /**
      * Query repair status of dbsvc or geodbsvc from DB
      */
-    private DbRepairStatus queryDbRepairStatus(String svcName) throws Exception {
+    private DbRepairStatus queryDbRepairStatus(String svcName) {
         int progress = -1;
         DbRepairStatus.Status status = null;
         Date startTime = null;
         Date endTime = null;
 
         log.info("Try to get repair status of {}", svcName);
-        try (DbManagerOps dbManagerOps = new DbManagerOps(svcName)) {
+
+        DbManagerOps dbManagerOps = null;
+        try {
+            dbManagerOps = new DbManagerOps(svcName);
+
             DbRepairStatus repairState = dbManagerOps.getLastRepairStatus(true);
 
             if (repairState != null) {
@@ -957,10 +961,15 @@ public class RecoveryManager implements Runnable {
                 startTime = (startTime == null) ? repairState.getStartTime() : startTime;
                 endTime = (endTime == null) ? repairState.getLastCompletionTime() : endTime;
             }
-        }
 
-        if (status != null) {
-            return new DbRepairStatus(status, startTime, endTime, progress);
+            if (status != null) {
+                return new DbRepairStatus(status, startTime, endTime, progress);
+            }
+        } catch (Exception e) {
+            log.error("Error in querying DbRepairStatus: {}", e.getMessage());
+            DbRepairStatus unknownStatus = new DbRepairStatus();
+            unknownStatus.setStatus(Status.UNKNOWN);
+            return unknownStatus;
         }
 
         return null;
