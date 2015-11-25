@@ -1020,6 +1020,7 @@ system.logs.last.4320=3 days
 system.logs.last.10080=1 week
 system.logs.last.20160=2 weeks
 system.logs.last.30240=3 weeks
+system.logs.last.43200=1 month
 system.logs.showLogs=Show Logs
 
 systemLogs.time_ms=Milliseconds
