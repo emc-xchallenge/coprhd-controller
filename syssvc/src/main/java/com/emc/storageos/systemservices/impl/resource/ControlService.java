@@ -37,6 +37,7 @@ import com.emc.storageos.svcs.errorhandling.resources.APIException;
 
 import static com.emc.storageos.coordinator.client.model.Constants.*;
 
+import com.emc.vipr.model.sys.recovery.HistoryRecoveryStatus;
 import com.emc.storageos.coordinator.client.model.Constants;
 import com.emc.storageos.coordinator.client.model.PowerOffState;
 import com.emc.storageos.systemservices.exceptions.LocalRepositoryException;
@@ -415,6 +416,18 @@ public class ControlService {
     public RecoveryStatus getRecoveryStatus() throws Exception {
         _log.info("Received a getting cluster recovery status request");
         return recoveryManager.queryNodeRecoveryStatus();
+    }
+
+    /**
+     *      * Show all node history recovery status
+     */
+    @GET
+    @Path("cluster/history/recovery")
+    @CheckPermission(roles = { Role.SYSTEM_ADMIN, Role.SECURITY_ADMIN, Role.SYSTEM_MONITOR })
+    @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
+    public HistoryRecoveryStatus getHistoryRecoveryStatus() throws Exception {
+        _log.info("Received a getting cluster recovery status request");
+        return recoveryManager.queryNodeHistoryRecoveryStatus();
     }
 
     /**

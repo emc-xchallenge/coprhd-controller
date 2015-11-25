@@ -2677,6 +2677,11 @@ Please DO NOT modify the content.
             </field>
         </fields>
     </data_object_schema>
+
+    <data_object_schema name="NodeRecoveryHistoryDb" tye="com.emc.storageos.db.client.model.NodeRecoveryHistoryDb">
+        <!--TODO: Add recovery Status config -->
+    </data_object_schema>
+
     <data_object_schema name="Volume" type="com.emc.storageos.db.client.model.Volume">
         <annotations/>
         <fields>

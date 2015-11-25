@@ -16,6 +16,8 @@ import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.emc.storageos.db.client.model.NodeRecoveryHistoryDb;
+import com.emc.vipr.model.sys.recovery.HistoryRecoveryStatus;
 import com.emc.storageos.model.property.PropertyConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -479,6 +481,10 @@ public class RecoveryManager implements Runnable {
         }
         RecoveryStatus recoveryStatus = queryNodeRecoveryStatus();
         recoveryStatus.setStatus(status);
+        RecoveryStatus.Status status1 = recoveryStatus.getStatus();
+        if( status1 == RecoveryStatus.Status.CANCELLED ||  status1 == RecoveryStatus.Status.CANCELLED || status1 == RecoveryStatus.Status.DONE ){
+            //TODO: update node's final Recovery status to DB. using dbClient
+        }
         persistNodeRecoveryStatus(recoveryStatus);
     }
 
@@ -964,5 +970,11 @@ public class RecoveryManager implements Runnable {
         }
 
         return null;
+    }
+    public HistoryRecoveryStatus queryNodeHistoryRecoveryStatus() {
+        List<URI>  uris =  dbClient.queryByType(NodeRecoveryHistoryDb.class, true);
+        Iterator<NodeRecoveryHistoryDb> _dbIterator = dbClient.queryIterativeObjects(NodeRecoveryHistoryDb.class, uris);
+        //TODO: convert the database data into HistoryRecoveryStatus
+        return new HistoryRecoveryStatus();
     }
 }
