@@ -414,7 +414,9 @@ public class ControlService {
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     public RecoveryStatus getRecoveryStatus() throws Exception {
         _log.info("Received a getting cluster recovery status request");
-        return recoveryManager.queryNodeRecoveryStatus();
+        RecoveryStatus recoveryStatus = recoveryManager.queryNodeRecoveryStatus();
+        recoveryStatus.setHistoryMsg(recoveryManager.queryHistoryNodeRecoveryStatus());
+        return recoveryStatus;
     }
 
     /**

@@ -65,6 +65,7 @@ public class RecoveryManager implements Runnable {
     private boolean waitOnRecoveryTriggering = false;
 
     private static final long REDEPLOY_MULTICAST_TIMEOUT = 120 * 60 * 1000; // 2 hours
+    private static final String HISTORY_CONFIG_ID = "history";
 
     @Autowired
     private CoordinatorClientExt coordinator;
@@ -423,6 +424,7 @@ public class RecoveryManager implements Runnable {
             validateNodeRecoveryStatus();
             validateClusterState();
 
+            persistHistoryNodeRecoveryStatus();
             RecoveryStatus status = new RecoveryStatus();
             status.setStatus(RecoveryStatus.Status.INIT);
             status.setStartTime(new Date());
@@ -589,6 +591,37 @@ public class RecoveryManager implements Runnable {
         }
         log.info("Recovery status is: {}", status);
         return status;
+    }
+
+    private void persistHistoryNodeRecoveryStatus() {
+        RecoveryStatus status = queryNodeRecoveryStatus();
+        log.info("Persist history node recovery status: {}", status);
+        if (status == null || status.getStatus() == null) {
+            log.info("Empty status and no need to be stored to history");
+            return;
+        }
+
+        ConfigurationImpl cfg = new ConfigurationImpl();
+        cfg.setKind(Constants.NODE_RECOVERY_STATUS);
+        cfg.setId(HISTORY_CONFIG_ID);
+
+        String existStatusStr = queryHistoryNodeRecoveryStatus();
+        String newStatusStr = status.getStatus().toString();
+        String updatedStatusStr = String.format("%s\t%s", existStatusStr, newStatusStr);
+        cfg.setConfig(RecoveryConstants.RECOVERY_STATUS, updatedStatusStr);
+
+        coordinator.getCoordinatorClient().persistServiceConfiguration(cfg);
+        log.info("Persist node recovery status({}) to history successfully", status);
+    }
+
+    public String queryHistoryNodeRecoveryStatus() {
+        String historyMsg = "";
+        Configuration cfg = coordinator.getCoordinatorClient().queryConfiguration(Constants.NODE_RECOVERY_STATUS,
+                HISTORY_CONFIG_ID);
+        if (cfg != null) {
+            historyMsg = cfg.getConfig(RecoveryConstants.RECOVERY_STATUS);
+        }
+        return historyMsg;
     }
 
     /**

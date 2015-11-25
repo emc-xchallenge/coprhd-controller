@@ -42,6 +42,7 @@ public class RecoveryStatus {
     private Date startTime;
     private Date endTime;
     private ErrorCode errorCode;
+    private String historyMsg;
 
     @XmlElement(name = "status")
     public Status getStatus() {
@@ -77,6 +78,15 @@ public class RecoveryStatus {
 
     public void setErrorCode(ErrorCode errorCode) {
         this.errorCode = errorCode;
+    }
+
+    @XmlElement(name = "history_msg")
+    public String getHistoryMsg() {
+        return this.historyMsg;
+    }
+
+    public void setHistoryMsg(String historyMsg) {
+        this.historyMsg = historyMsg;
     }
 
     @Override
